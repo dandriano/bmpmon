@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"net/http"
 
 	"github.com/d2r2/go-logger"
 )
 
 func main() {
+	logger.ChangePackageLogLevel("i2c", logger.WarnLevel)
+	logger.ChangePackageLogLevel("bsbmp", logger.WarnLevel)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -19,8 +24,14 @@ func main() {
 	}
 	defer sens.Close()
 
-	logger.ChangePackageLogLevel("i2c", logger.WarnLevel)
-	logger.ChangePackageLogLevel("bsbmp", logger.WarnLevel)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		resp, err := sens.Peek()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	sens.Listen(ctx)
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	http.ListenAndServe(":80", nil)
 }
