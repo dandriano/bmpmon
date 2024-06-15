@@ -5,30 +5,42 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"time"
 )
 
 const (
 	schema = `
 CREATE TABLE IF NOT EXISTS sensor_log (
     time TIMESTAMP,
-    temperature FLOAT
+    temperature FLOAT,
+	altitude FLOAT,
+	pressure FLOAT
 );
 
 CREATE INDEX IF NOT EXISTS sensor_time ON sensor_log(time);
 `
 	insert = `
 INSERT INTO sensor_log (
-	time, temperature
+	time, temperature, altitude, pressure
 ) 
 VALUES (
-	?, ?
+	?, ?, ?, ?
 )
 `
 	fetch = `
-SELECT * FROM sensor_log 
+SELECT time, temperature, altitude, pressure FROM sensor_log 
+ORDER BY time DESC 
 LIMIT ?
 `
 )
+
+type sensorResponse struct {
+	Timestamp   time.Time     `json:"timestamp"`
+	Elapsed     time.Duration `json:"elapsed"`
+	Temperature float32       `json:"temperature"`
+	Pressure    float32       `json:"pressure"`
+	Altitude    float32       `json:"altitude"`
+}
 
 type storage struct {
 	sql    *sql.DB
@@ -95,7 +107,7 @@ func (s *storage) Fetch(last int) ([]sensorResponse, error) {
 
 	for rows.Next() {
 		var r sensorResponse
-		if err := rows.Scan(&r.Timestamp, &r.Temperature); err != nil {
+		if err := rows.Scan(&r.Timestamp, &r.Temperature, &r.Altitude, &r.Pressure); err != nil {
 			return nil, err
 		}
 		res = append(res, r)
@@ -110,8 +122,8 @@ func (s *storage) Flush() error {
 		return err
 	}
 
-	for _, trade := range s.buffer {
-		_, err := tx.Stmt(s.ins).Exec(trade.Timestamp, trade.Temperature)
+	for _, record := range s.buffer {
+		_, err := tx.Stmt(s.ins).Exec(record.Timestamp, record.Temperature, record.Altitude, record.Pressure)
 		if err != nil {
 			tx.Rollback()
 			return err

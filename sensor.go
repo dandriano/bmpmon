@@ -9,14 +9,6 @@ import (
 	"github.com/d2r2/go-i2c"
 )
 
-type sensorResponse struct {
-	Timestamp   time.Time     `json:"timestamp"`
-	Elapsed     time.Duration `json:"elapsed"`
-	Temperature float32       `json:"temperature"`
-	Pressure    float32       `json:"pressure"`
-	Altitude    float32       `json:"altitude"`
-}
-
 type sensor struct {
 	i2c     *i2c.I2C
 	bmpsens *bsbmp.BMP
