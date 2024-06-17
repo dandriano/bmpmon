@@ -8,6 +8,7 @@ import (
 
 	"github.com/d2r2/go-logger"
 	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/components"
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/types"
 	_ "github.com/mattn/go-sqlite3"
@@ -43,6 +44,7 @@ func main() {
 	// serve requests
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+
 		peek, err := sens.Peek()
 		if err != nil {
 			log.Fatal(err)
@@ -54,16 +56,7 @@ func main() {
 		}
 		resp = append(resp, peek)
 
-		line := charts.NewLine()
-		line.SetGlobalOptions(
-			charts.WithInitializationOpts(opts.Initialization{
-				PageTitle: "slack@sarpi",
-				Theme:     types.ThemeWesteros}),
-			charts.WithTitleOpts(opts.Title{
-				Title:    "Temperature log history",
-				Subtitle: "powered by slack@sarpi",
-			}))
-
+		// generate data for charts
 		x := make([]string, 0)
 		t := make([]opts.LineData, 0)
 		p := make([]opts.LineData, 0)
@@ -74,16 +67,45 @@ func main() {
 			p = append(p, opts.LineData{Value: re.Pressure})
 		}
 
-		line.SetXAxis(x).
-			AddSeries("Temp C", t).
-			AddSeries("Press MmHg", p).
+		// build charts
+		temperatureLine := charts.NewLine()
+		temperatureLine.SetGlobalOptions(
+			charts.WithInitializationOpts(opts.Initialization{
+				Theme: types.ThemeWesteros}),
+			charts.WithTitleOpts(opts.Title{
+				Title: "Temperature log",
+			}))
+
+		temperatureLine.SetXAxis(x).
+			AddSeries("Temperature °C", t).
 			SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{
+				Color:      "blue",
 				Smooth:     true,
 				Symbol:     "circle",
 				ShowSymbol: true}))
 
-		line.Render(w)
-		// json.NewEncoder(w).Encode(resp)
+		pressureLine := charts.NewLine()
+		pressureLine.SetGlobalOptions(
+			charts.WithInitializationOpts(opts.Initialization{
+				Theme: types.ThemeWesteros}),
+			charts.WithTitleOpts(opts.Title{
+				Title: "Pressure log",
+			}))
+
+		pressureLine.SetXAxis(x).
+			AddSeries("Pressure mm Hg", p).
+			SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{
+				Color:      "red",
+				Smooth:     true,
+				Symbol:     "circle",
+				ShowSymbol: true}))
+
+		// render page
+		page := components.NewPage()
+		page.PageTitle = "slack@sarpi"
+		page.SetLayout(components.PageFlexLayout)
+		page.AddCharts(temperatureLine, pressureLine)
+		page.Render(w)
 
 		log.Printf("BMPMON:\tServed addr=%v\tela=%v\n", r.RemoteAddr, time.Since(start))
 	})
