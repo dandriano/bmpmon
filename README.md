@@ -24,3 +24,7 @@ Just a go-playground after the [sarpi](https://sarpi.penthux.net/) project was f
            ::::::::::::::::::::::
                 ::::::::::::
 ```
+## points of interest
+1. [`sensor.go`](https://github.com/dandriano/bmpmon/blob/master/sensor.go) - service-like wrapper around existing Bosch BMP Sensor library (also, early zyre-composited [variant](https://github.com/dandriano/bmpmon/blob/dd940aabfe7a73b01b2483e1b20ce303d1dd9b96/sensor.go#L55))
+2. [`storage.go`](https://github.com/dandriano/bmpmon/blob/master/storage.go) - minimal sqlite-based storage (alas, with out unitofwork but with buffer example)
+3. [`main.go`](https://github.com/dandriano/bmpmon/blob/master/main.go#L45-L111) - html-view builded with [`go-echarts`](https://github.com/go-echarts/go-echarts) (also, a real-time alike [implementation](https://github.com/go-echarts/statsview))
