@@ -97,14 +97,13 @@ func (s *storage) Fetch(last int) ([]sensorResponse, error) {
 	}
 	defer tx.Rollback()
 
-	res := s.buffer
-	last -= len(res)
-	rows, err := tx.Query(fetch, last)
+	rows, err := tx.Query(fetch, last-len(s.buffer))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
+	var res []sensorResponse
 	for rows.Next() {
 		var r sensorResponse
 		if err := rows.Scan(&r.Timestamp, &r.Temperature, &r.Altitude, &r.Pressure); err != nil {
@@ -112,6 +111,7 @@ func (s *storage) Fetch(last int) ([]sensorResponse, error) {
 		}
 		res = append(res, r)
 	}
+	res = append(res, s.buffer...)
 
 	return res, nil
 }

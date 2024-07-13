@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -41,10 +42,8 @@ func main() {
 	go sens.pool(ctx, 15*time.Minute, io)
 	go st.serve(ctx, io)
 
-	// serve requests
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-
+	// some sort of "relay" commands
+	peekData := func() []sensorResponse {
 		peek, err := sens.Peek()
 		if err != nil {
 			log.Fatal(err)
@@ -54,20 +53,40 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		resp = append(resp, peek)
+		return append(resp, peek)
+	}
 
+	genChart := func() ([]string, []opts.LineData, []opts.LineData) {
 		// generate data for charts
 		x := make([]string, 0)
 		t := make([]opts.LineData, 0)
 		p := make([]opts.LineData, 0)
 
-		for _, re := range resp {
+		for _, re := range peekData() {
 			x = append(x, re.Timestamp.Format(time.RFC1123))
 			t = append(t, opts.LineData{Value: re.Temperature})
 			p = append(p, opts.LineData{Value: re.Pressure})
 		}
 
+		return x, t, p
+	}
+
+	// serve requests: json
+	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		w.Header().Set("Content-Type", "application/json")
+
+		json.NewEncoder(w).Encode(peekData())
+
+		log.Printf("BMPMON:\tServed /json addr=%v\tela=%v\n", r.RemoteAddr, time.Since(start))
+	})
+
+	// serve requests: chart
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
 		// build charts
+		x, t, p := genChart()
 		temperatureLine := charts.NewLine()
 		temperatureLine.SetGlobalOptions(
 			charts.WithInitializationOpts(opts.Initialization{
@@ -107,7 +126,7 @@ func main() {
 		page.AddCharts(temperatureLine, pressureLine)
 		page.Render(w)
 
-		log.Printf("BMPMON:\tServed addr=%v\tela=%v\n", r.RemoteAddr, time.Since(start))
+		log.Printf("BMPMON:\tServed / addr=%v\tela=%v\n", r.RemoteAddr, time.Since(start))
 	})
 
 	log.Println("BMPMON:\tOn")
