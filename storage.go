@@ -6,36 +6,39 @@ import (
 	"errors"
 	"log"
 	"time"
+
+	// _ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
 	schema = `
 CREATE TABLE IF NOT EXISTS sensor_log (
-    time TIMESTAMP,
+    time TIMESTAMP NOT NULL,
     temperature FLOAT,
-	altitude FLOAT,
-	pressure FLOAT
+    altitude FLOAT,
+    pressure FLOAT
 );
 
 CREATE INDEX IF NOT EXISTS sensor_time ON sensor_log(time);
 `
 	insert = `
 INSERT INTO sensor_log (
-	time, temperature, altitude, pressure
-) 
-VALUES (
-	?, ?, ?, ?
+    time, temperature, altitude, pressure
 )
+VALUES (
+    $1, $2, $3, $4
+);
 `
 	fetch = `
 SELECT time, temperature, altitude, pressure FROM sensor_log 
 ORDER BY time DESC 
-LIMIT ?
+LIMIT $1;
 `
 )
 
 type sensorResponse struct {
-	Timestamp   time.Time     `json:"timestamp"`
+	Timestamp   time.Time     `json:"time"`
 	Elapsed     time.Duration `json:"elapsed"`
 	Temperature float32       `json:"temperature"`
 	Pressure    float32       `json:"pressure"`
@@ -49,9 +52,15 @@ type storage struct {
 }
 
 func NewStorage(connect string, bsize int) (*storage, error) {
+	// or remote postgres
 	conn, err := sql.Open("sqlite3", connect)
 	if err != nil {
 		return nil, err
+	}
+
+	err = conn.Ping()
+	if err != nil {
+		panic(err)
 	}
 
 	if _, err = conn.Exec(schema); err != nil {

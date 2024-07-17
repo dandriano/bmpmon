@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/d2r2/go-logger"
@@ -12,7 +14,6 @@ import (
 	"github.com/go-echarts/go-echarts/v2/components"
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/types"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -43,26 +44,26 @@ func main() {
 	go st.serve(ctx, io)
 
 	// some sort of "relay" commands
-	peekData := func() []sensorResponse {
+	peekData := func(count int) []sensorResponse {
 		peek, err := sens.Peek()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		resp, err := st.Fetch(10)
+		resp, err := st.Fetch(count)
 		if err != nil {
 			log.Fatal(err)
 		}
 		return append(resp, peek)
 	}
 
-	genChart := func() ([]string, []opts.LineData, []opts.LineData) {
+	genChart := func(count int) ([]string, []opts.LineData, []opts.LineData) {
 		// generate data for charts
 		x := make([]string, 0)
 		t := make([]opts.LineData, 0)
 		p := make([]opts.LineData, 0)
 
-		for _, re := range peekData() {
+		for _, re := range peekData(count) {
 			x = append(x, re.Timestamp.Format(time.RFC1123))
 			t = append(t, opts.LineData{Value: re.Temperature})
 			p = append(p, opts.LineData{Value: re.Pressure})
@@ -72,12 +73,18 @@ func main() {
 	}
 
 	// serve requests: json
-	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/json/", func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		w.Header().Set("Content-Type", "application/json")
 
-		json.NewEncoder(w).Encode(peekData())
-
+		parts := strings.Split(r.URL.Path, "/")
+		x := 10
+		if len(parts) > 3 {
+			if x, err = strconv.Atoi(parts[2]); err != nil {
+				log.Fatal(err)
+			}
+		}
+		json.NewEncoder(w).Encode(peekData(x))
 		log.Printf("BMPMON:\tServed /json addr=%v\tela=%v\n", r.RemoteAddr, time.Since(start))
 	})
 
@@ -86,7 +93,7 @@ func main() {
 		start := time.Now()
 
 		// build charts
-		x, t, p := genChart()
+		x, t, p := genChart(10)
 		temperatureLine := charts.NewLine()
 		temperatureLine.SetGlobalOptions(
 			charts.WithInitializationOpts(opts.Initialization{
